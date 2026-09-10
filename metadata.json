@@ -1,0 +1,6 @@
+{
+  "name": "ProdTracker",
+  "description": "Enterprise Production Deployment Management System with GDD tracking, real-time analytics, and Excel reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
