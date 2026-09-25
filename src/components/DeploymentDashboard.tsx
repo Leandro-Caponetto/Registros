@@ -19,7 +19,7 @@ import {
   deleteMultipleDeploymentsFromSupabase,
   mapDeploymentToRow
 } from '../utils/supabase';
-import { exportDeploymentsToExcel } from '../utils/exportToExcel';
+import { exportDeploymentsToExcel, exportMiddlewareToExcel } from '../utils/exportToExcel';
 import { 
   DeploymentRecord, 
   DeploymentFormData, 
@@ -39,6 +39,13 @@ import { DeploymentDetailModal } from './DeploymentDetailModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { SupabaseModal } from './SupabaseModal';
 import { ChangeProductModal } from './ChangeProductModal';
+import { PresentationModal } from './PresentationModal';
+import { exportDeploymentsToPowerPoint } from '../utils/exportToPowerPoint';
+import { MiddlewareDashboard } from './middleware/MiddlewareDashboard';
+import { GeminiChatbot } from './GeminiChatbot';
+import { GeminiConnectionModal } from './GeminiConnectionModal';
+import { getIntegrations } from '../utils/integrationStorage';
+import { MiddlewareIntegration } from '../types/integration';
 import { 
   CheckCircle2, 
   Info, 
@@ -48,12 +55,15 @@ import {
   Plus, 
   Sparkles, 
   RotateCcw,
-  RefreshCw 
+  RefreshCw,
+  Presentation
 } from 'lucide-react';
 
 export const DeploymentDashboard: React.FC = () => {
   // Main Data State
   const [records, setRecords] = useState<DeploymentRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<'deployments' | 'middleware'>('deployments');
+  const [integrationsCount, setIntegrationsCount] = useState<number>(0);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSupabaseActive, setIsSupabaseActive] = useState<boolean>(false);
@@ -61,6 +71,11 @@ export const DeploymentDashboard: React.FC = () => {
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSupabaseOpen, setIsSupabaseOpen] = useState(false);
+  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const [isGeminiGuideOpen, setIsGeminiGuideOpen] = useState(false);
+  const [middlewareRecords, setMiddlewareRecords] = useState<MiddlewareIntegration[]>(() => getIntegrations());
+  const [presentationCustomRecords, setPresentationCustomRecords] = useState<DeploymentRecord[] | null>(null);
   const [editingRecord, setEditingRecord] = useState<DeploymentRecord | null>(null);
   const [viewingRecord, setViewingRecord] = useState<DeploymentRecord | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<DeploymentRecord | null>(null);
@@ -119,7 +134,16 @@ export const DeploymentDashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    const mw = getIntegrations();
+    setMiddlewareRecords(mw);
+    setIntegrationsCount(mw.length);
   }, [loadData]);
+
+  useEffect(() => {
+    const mw = getIntegrations();
+    setMiddlewareRecords(mw);
+    setIntegrationsCount(mw.length);
+  }, [activeTab]);
 
   // Available unique products
   const availableProducts = useMemo(() => {
@@ -465,6 +489,19 @@ export const DeploymentDashboard: React.FC = () => {
 
   // Excel Export Handler
   const handleExportExcelAll = () => {
+    if (activeTab === 'middleware') {
+      const btn = document.getElementById('btn-export-middleware-excel');
+      if (btn) {
+        btn.click();
+        return;
+      }
+      const data = getIntegrations();
+      const ok = exportMiddlewareToExcel(data);
+      if (ok) {
+        showToast(`Excel generado con ${data.length} integraciones middleware`, 'success');
+      }
+      return;
+    }
     const target = filteredAndSortedRecords.length > 0 ? filteredAndSortedRecords : records;
     const ok = exportDeploymentsToExcel(target, 'ProdTracker_Pases_Produccion');
     if (ok) {
@@ -477,6 +514,33 @@ export const DeploymentDashboard: React.FC = () => {
     if (ok) {
       showToast(`Excel generado con ${selected.length} registros seleccionados`, 'success');
     }
+  };
+
+  // PowerPoint Presentation Handlers
+  const handleOpenPresentation = (custom?: DeploymentRecord[] | DeploymentRecord) => {
+    if (custom) {
+      setPresentationCustomRecords(Array.isArray(custom) ? custom : [custom]);
+    } else {
+      setPresentationCustomRecords(null);
+    }
+    setIsPresentationOpen(true);
+  };
+
+  const handleExportPowerPointAll = async () => {
+    const target = filteredAndSortedRecords.length > 0 ? filteredAndSortedRecords : records;
+    if (target.length === 0) {
+      showToast('No hay registros para la presentación PowerPoint', 'info');
+      return;
+    }
+    showToast('Generando presentación PowerPoint (.pptx)...', 'info');
+    const ok = await exportDeploymentsToPowerPoint(target);
+    if (ok) {
+      showToast('Presentación PowerPoint descargada con éxito', 'success');
+    }
+  };
+
+  const handleExportPowerPointSelected = (selected: DeploymentRecord[]) => {
+    handleOpenPresentation(selected);
   };
 
   // Clear data (leaves table empty)
@@ -550,60 +614,105 @@ export const DeploymentDashboard: React.FC = () => {
 
       {/* Header Navigation */}
       <Navbar
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
         onOpenNewModal={() => {
-          setEditingRecord(null);
-          setIsFormOpen(true);
+          if (activeTab === 'middleware') {
+            const btn = document.getElementById('btn-new-integration');
+            if (btn) {
+              btn.click();
+            }
+          } else {
+            setEditingRecord(null);
+            setIsFormOpen(true);
+          }
         }}
         onExportExcel={handleExportExcelAll}
+        onOpenPresentation={() => {
+          if (activeTab === 'middleware') {
+            const btn = document.getElementById('btn-export-middleware-pptx');
+            if (btn) {
+              btn.click();
+              return;
+            }
+          }
+          handleOpenPresentation();
+        }}
         onResetData={handleLoadDemoData}
         onClearData={handleClearAll}
         onOpenSupabaseModal={() => setIsSupabaseOpen(true)}
+        onOpenChatbot={() => setIsChatbotOpen(true)}
+        onOpenGeminiGuide={() => setIsGeminiGuideOpen(true)}
         isSupabaseActive={isSupabaseActive}
         totalRecords={records.length}
         pendingCount={kpis.pendingVerificationCount}
+        integrationsCount={integrationsCount}
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto px-3 sm:px-4 lg:px-6 py-6">
         
-        {/* Top Section Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-                Panel de Control de Despliegues a Producción
-              </h1>
+        {/* TAB 1: MIDDLEWARE INTEGRATIONS VIEW */}
+        {activeTab === 'middleware' && (
+          <MiddlewareDashboard />
+        )}
+
+        {/* TAB 2: DEPLOYMENTS VIEW */}
+        {activeTab === 'deployments' && (
+          <>
+            {/* Top Section Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+                    Panel de Control de Despliegues a Producción
+                  </h1>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                  Registro, verificación y auditoría de cambios y servicios pasados a producción
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {/* Supabase Indicator Button */}
+                <button
+                  onClick={() => setIsSupabaseOpen(true)}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 shadow-xs transition-colors"
+                >
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  <span>{isSupabaseActive ? 'Supabase Sincronizado' : 'Conectar Supabase (SQL)'}</span>
+                </button>
+
+                {/* PowerPoint Presentation Button */}
+                {records.length > 0 && (
+                  <button
+                    id="btn-main-powerpoint"
+                    onClick={() => handleOpenPresentation()}
+                    title="Presentar o descargar diapositivas en PowerPoint (.pptx)"
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 border border-orange-500/30 shadow-md shadow-orange-600/20 transition-all active:scale-95"
+                  >
+                    <Presentation className="w-4 h-4 text-white" />
+                    <span>Presentación PowerPoint</span>
+                  </button>
+                )}
+
+                {/* Export Excel Button */}
+                {records.length > 0 && (
+                  <button
+                    onClick={handleExportExcelAll}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-200 bg-slate-900 hover:bg-slate-800 border border-slate-700 shadow-xs transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                    <span>Exportar Excel</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Registro, verificación y auditoría de cambios y servicios pasados a producción
-            </p>
-          </div>
+          </>
+        )}
 
-          <div className="flex items-center gap-2.5">
-            {/* Supabase Indicator Button */}
-            <button
-              onClick={() => setIsSupabaseOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 shadow-xs transition-colors"
-            >
-              <Database className="w-4 h-4 text-emerald-400" />
-              <span>{isSupabaseActive ? 'Supabase Sincronizado' : 'Conectar Supabase (SQL)'}</span>
-            </button>
-
-            {/* Export Excel Button */}
-            {records.length > 0 && (
-              <button
-                onClick={handleExportExcelAll}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-200 bg-slate-900 hover:bg-slate-800 border border-slate-700 shadow-xs transition-colors"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-                <span>Exportar Excel</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Empty State Banner when 0 records exist */}
-        {records.length === 0 && !isLoading && (
+        {/* Empty State Banner when 0 records exist (only on deployments tab) */}
+        {activeTab === 'deployments' && records.length === 0 && !isLoading && (
           <div className="my-8 p-8 sm:p-12 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 text-center relative overflow-hidden shadow-2xl">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-indigo-500/10 via-transparent to-transparent pointer-events-none"></div>
             
@@ -655,8 +764,8 @@ export const DeploymentDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* When records exist, show Full KPIs, Charts, Filters and Table */}
-        {records.length > 0 && (
+        {/* When records exist, show Full KPIs, Charts, Filters and Table (only on deployments tab) */}
+        {activeTab === 'deployments' && records.length > 0 && (
           <>
             {/* KPI Metrics Overview */}
             <KpiOverview
@@ -692,6 +801,7 @@ export const DeploymentDashboard: React.FC = () => {
               onDelete={(record) => setDeletingRecord(record)}
               onDuplicate={handleDuplicateRecord}
               onExportSelected={handleExportExcelSelected}
+              onPresentSelected={handleExportPowerPointSelected}
               onBulkVerify={handleBulkVerify}
               onBulkDelete={handleBulkDelete}
               onResetFilters={handleResetFilters}
@@ -705,7 +815,7 @@ export const DeploymentDashboard: React.FC = () => {
       <footer className="mt-auto border-t border-slate-800/80 bg-slate-950 py-4 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>ProdTracker Enterprise v3.8 • Control de Pases y Auditoría GDD</span>
-          <span>{isSupabaseActive ? '🟢 Sincronizado con Supabase PostgreSQL' : '⚪ Almacenamiento Local Activo'} • Exportación Excel (.xlsx)</span>
+          <span>{isSupabaseActive ? '🟢 Sincronizado con Supabase PostgreSQL' : '⚪ Almacenamiento Local Activo'} • Exportación Excel (.xlsx) & PowerPoint (.pptx)</span>
         </div>
       </footer>
 
@@ -731,6 +841,7 @@ export const DeploymentDashboard: React.FC = () => {
           setIsFormOpen(true);
         }}
         onChangeProduct={(record) => setChangingProductRecord(record)}
+        onOpenPresentation={(record) => handleOpenPresentation(record)}
         onUpdateStatus={handleUpdateStatus}
       />
 
@@ -763,6 +874,37 @@ export const DeploymentDashboard: React.FC = () => {
         onSyncPush={handleSyncPush}
         onSyncPull={handleSyncPull}
         localCount={records.length}
+      />
+
+      {/* PowerPoint Interactive Presentation & PPTX Export Modal */}
+      <PresentationModal
+        isOpen={isPresentationOpen}
+        onClose={() => {
+          setIsPresentationOpen(false);
+          setPresentationCustomRecords(null);
+        }}
+        records={
+          presentationCustomRecords ||
+          (filteredAndSortedRecords.length > 0 ? filteredAndSortedRecords : records)
+        }
+      />
+
+      {/* Gemini AI Assistant Chatbot (ProdBot) */}
+      <GeminiChatbot
+        deployments={records}
+        middleware={middlewareRecords}
+        isOpen={isChatbotOpen}
+        onToggle={() => setIsChatbotOpen(!isChatbotOpen)}
+        onOpenNewDeployment={() => {
+          setEditingRecord(null);
+          setIsFormOpen(true);
+        }}
+      />
+
+      {/* Gemini Connection Guide Modal */}
+      <GeminiConnectionModal
+        isOpen={isGeminiGuideOpen}
+        onClose={() => setIsGeminiGuideOpen(false)}
       />
 
     </div>

@@ -14,7 +14,8 @@ import {
   Clock,
   Sparkles,
   FileSpreadsheet,
-  CheckCircle2
+  CheckCircle2,
+  Presentation
 } from 'lucide-react';
 import { DeploymentRecord, SortField, SortDirection } from '../types/deployment';
 
@@ -29,6 +30,7 @@ interface DeploymentTableProps {
   onDelete: (record: DeploymentRecord) => void;
   onDuplicate: (record: DeploymentRecord) => void;
   onExportSelected: (selectedRecords: DeploymentRecord[]) => void;
+  onPresentSelected?: (selectedRecords: DeploymentRecord[]) => void;
   onBulkVerify: (selectedIds: string[]) => void;
   onBulkDelete: (selectedIds: string[]) => void;
   onResetFilters: () => void;
@@ -45,6 +47,7 @@ export const DeploymentTable: React.FC<DeploymentTableProps> = ({
   onDelete,
   onDuplicate,
   onExportSelected,
+  onPresentSelected,
   onBulkVerify,
   onBulkDelete,
   onResetFilters,
@@ -196,8 +199,17 @@ export const DeploymentTable: React.FC<DeploymentTableProps> = ({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium transition-colors"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Exportar Selección a Excel</span>
+              <span>Exportar Excel</span>
             </button>
+            {onPresentSelected && (
+              <button
+                onClick={() => onPresentSelected(selectedRecords)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded font-medium transition-colors shadow-sm"
+              >
+                <Presentation className="w-3.5 h-3.5" />
+                <span>Presentar en PowerPoint</span>
+              </button>
+            )}
             <button
               onClick={() => {
                 onBulkVerify(selectedIds);

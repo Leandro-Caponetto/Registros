@@ -17,7 +17,8 @@ import {
   Tag,
   CheckCircle2,
   Flame,
-  CornerUpLeft
+  CornerUpLeft,
+  Presentation
 } from 'lucide-react';
 import { DeploymentRecord, DeploymentStatus } from '../types/deployment';
 import { exportDeploymentsToExcel } from '../utils/exportToExcel';
@@ -27,6 +28,7 @@ interface DeploymentDetailModalProps {
   onClose: () => void;
   onEdit: (record: DeploymentRecord) => void;
   onChangeProduct?: (record: DeploymentRecord) => void;
+  onOpenPresentation?: (record: DeploymentRecord) => void;
   onUpdateStatus: (id: string, newStatus: DeploymentStatus) => void;
 }
 
@@ -35,6 +37,7 @@ export const DeploymentDetailModal: React.FC<DeploymentDetailModalProps> = ({
   onClose,
   onEdit,
   onChangeProduct,
+  onOpenPresentation,
   onUpdateStatus,
 }) => {
   const [copiedSlack, setCopiedSlack] = useState(false);
@@ -105,6 +108,18 @@ ${record.rollbackPlan || 'Restauración de versión anterior'}
           </div>
 
           <div className="flex items-center gap-2">
+            {onOpenPresentation && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenPresentation(record);
+                }}
+                title="Ver o Presentar en PowerPoint"
+                className="p-2 text-orange-400 hover:bg-orange-500/10 rounded-lg transition-colors border border-orange-500/20"
+              >
+                <Presentation className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={handleExportSingle}
               title="Descargar Ficha en Excel"

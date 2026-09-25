@@ -18,6 +18,7 @@ export interface DeploymentRecord {
   aprobadoPor: string; // Approver / CAB Lead
   ambiente: string; // e.g. "PROD-Cluster-US", "PROD-Core-Fintech"
   version: string; // e.g. "v4.1.2"
+  plataformaGrupo?: string; // e.g. "MiCorreo", "PAQ.AR", "Mercado Libre / Mercado Envíos"
   rollbackPlan?: string; // Rollback script or procedure reference
   jiraTicket?: string; // Ticket reference, e.g. "PROD-9402"
   createdAt: string;
